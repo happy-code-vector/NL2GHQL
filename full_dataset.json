@@ -1,0 +1,452 @@
+[
+  {
+    "id": "1eb83408-d9f6-41df-9973-bb4048b4746a",
+    "version": "0.2.4",
+    "score": 60,
+    "question": "What is the total amount of SQT tokens that have been recorded as the single highest aggregate reward amount earned by a project deployment specifically through service agreement contracts during era 42200?",
+    "responseTime": "62.68s",
+    "tokens": 246,
+    "timestamp": "2/22/2026, 5:55:58 AM"
+  },
+  {
+    "id": "eabcaa2d-6ff4-495c-99df-c6e43097c838",
+    "version": "0.2.4",
+    "score": 0,
+    "question": "What is the total amount of SQT tokens that have been recorded as the combined sum of all rewards ever earned from serving query services by the single network project deployment that has the highest recorded count of unique consumers who have maintained",
+    "responseTime": "18.67s",
+    "tokens": 246,
+    "timestamp": "2/22/2026, 5:53:35 AM"
+  },
+  {
+    "id": "691be1d3-a5be-4f05-97be-37a7e1931f18",
+    "version": "0.2.4",
+    "score": 251,
+    "question": "What is the total amount of SQT tokens that have been managed as query spending for the project that has recorded the highest cumulative amount of boost funds across all of its deployments?",
+    "responseTime": "9.43s",
+    "tokens": 246,
+    "timestamp": "2/22/2026, 5:45:16 AM"
+  },
+  {
+    "id": "cb2c9649-871c-40a0-8120-16e6e0a3aef7",
+    "version": "0.2.4",
+    "score": 60,
+    "question": "What is the total amount of SQT tokens currently recorded as the net self-stake for the network operator that has the single highest total amount of rewards earned across all eras?",
+    "responseTime": "33.90s",
+    "tokens": 245,
+    "timestamp": "2/22/2026, 5:24:01 AM"
+  },
+  {
+    "id": "35b8c9b8-9baf-471f-8721-83c18d8eb4b5",
+    "version": "0.2.4",
+    "score": 0,
+    "question": "What is the total amount of SQT tokens that have been recorded as the combined sum of all rewards ever earned from serving query services by the single network operator whose service plans have been used to establish the highest number of active service a",
+    "responseTime": "16.32s",
+    "tokens": 245,
+    "timestamp": "2/22/2026, 5:22:40 AM"
+  },
+  {
+    "id": "06c48d0a-e17c-4a75-ae27-4021e3d3475f",
+    "version": "0.2.4",
+    "score": 251,
+    "question": "What is the total amount of SQT tokens that have been distributed as rewards to the single delegator who has recorded the highest cumulative amount of unclaimed rewards from all of their currently active indexer delegations?",
+    "responseTime": "17.13s",
+    "tokens": 244,
+    "timestamp": "2/22/2026, 5:14:08 AM"
+  },
+  {
+    "id": "7a6fb97b-5107-4d12-bcd9-07f85ac011d0",
+    "version": "0.2.4",
+    "score": 60,
+    "question": "What is the total amount of SQT tokens that have been recorded as the single highest aggregate reward amount earned by a project deployment specifically through state channel settlements during era 38400?",
+    "responseTime": "22.96s",
+    "tokens": 243,
+    "timestamp": "2/22/2026, 4:51:56 AM"
+  },
+  {
+    "id": "21743784-9012-4cd4-9ff8-258ba712bf48",
+    "version": "0.2.4",
+    "score": 0,
+    "question": "What is the total amount of SQT tokens that has been recorded as the combined sum of all rewards ever earned from serving query services by the three network project deployments that have the highest recorded count of unique consumers who have maintained",
+    "responseTime": "9.05s",
+    "tokens": 243,
+    "timestamp": "2/22/2026, 4:51:54 AM"
+  },
+  {
+    "id": "c9a77d59-f528-45ac-8e8e-f772dfeca680",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total amount of SQT tokens currently established as the single highest aggregate reward amount earned by a network operator specifically from service agreements across all their deployments during era 24200?",
+    "responseTime": "10.14s",
+    "tokens": 2,
+    "timestamp": "2/22/2026, 4:50:52 AM"
+  },
+  {
+    "id": "3827d6fe-622f-4437-a594-da0283e9a5f7",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total amount of SQT tokens currently established as the single highest aggregate reward amount earned by a network operator specifically from service agreements across all their deployments in era 16200?",
+    "responseTime": "12.17s",
+    "tokens": 2,
+    "timestamp": "2/22/2026, 4:48:01 AM"
+  },
+  {
+    "id": "bf6ad513-2e4e-454c-aad2-5259c5709bc4",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total amount of SQT tokens currently established as the single highest aggregate reward amount earned by a network operator specifically from service agreements across all their deployments in era 16200?",
+    "responseTime": "12.82s",
+    "tokens": 2,
+    "timestamp": "2/22/2026, 4:46:24 AM"
+  },
+  {
+    "id": "e27f2c3b-0daa-46d2-8894-0bbba1a2b924",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total amount of SQT tokens currently established as the single highest aggregate reward amount earned by a network operator specifically from service agreements across all their deployments during era 14200?",
+    "responseTime": "11.20s",
+    "tokens": 2,
+    "timestamp": "2/22/2026, 4:42:23 AM"
+  },
+  {
+    "id": "735064c9-34ee-495d-b674-7da76a6e332c",
+    "version": "0.2.4",
+    "score": 251,
+    "question": "What is the total amount of SQT tokens that have been distributed as rewards to the single delegator who has achieved the highest cumulative yield across all of their indexer delegations in the most recent completed era?",
+    "responseTime": "12.74s",
+    "tokens": 243,
+    "timestamp": "2/22/2026, 4:42:18 AM"
+  },
+  {
+    "id": "ffc53d33-ca72-42e7-b7cf-30e2255d5464",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total amount of SQT tokens currently established as the single highest aggregate reward amount earned by a network operator specifically from service agreements across all their deployments during era 14200?",
+    "responseTime": "16.96s",
+    "tokens": 2,
+    "timestamp": "2/22/2026, 4:39:52 AM"
+  },
+  {
+    "id": "3ecdeb80-0681-4bef-a3e5-120683885e4a",
+    "version": "0.2.4",
+    "score": 0,
+    "question": "What is the total amount of SQT tokens currently recorded as the combined sum of all rewards ever earned from stake allocations by the three network operators who have the highest recorded values for their current remaining delegation capacity?",
+    "responseTime": "9.42s",
+    "tokens": 242,
+    "timestamp": "2/22/2026, 4:21:00 AM"
+  },
+  {
+    "id": "d57208b2-0f2a-4225-a04c-d210be50b2ce",
+    "version": "0.2.4",
+    "score": 60,
+    "question": "What is the total amount of SQT tokens currently locked as the net self-stake for the indexer that has the single highest total amount of rewards earned across all eras?",
+    "responseTime": "25.46s",
+    "tokens": 242,
+    "timestamp": "2/22/2026, 4:20:40 AM"
+  },
+  {
+    "id": "0596b780-3944-4c14-a7ff-b2ce858a63a0",
+    "version": "0.2.4",
+    "score": 251,
+    "question": "What is the total amount of SQT tokens that have been distributed as rewards for stake allocations on the project deployment that has recorded the highest cumulative amount of query spending across the network?",
+    "responseTime": "23.58s",
+    "tokens": 242,
+    "timestamp": "2/22/2026, 4:11:24 AM"
+  },
+  {
+    "id": "88e10aca-ea3c-4c39-b872-f9a337d9292b",
+    "version": "0.2.4",
+    "score": 0,
+    "question": "What is the total amount of SQT tokens that have been recorded as the combined sum of all rewards ever earned from serving query services by the three network project deployments that have the highest recorded count of unique consumers who have maintained",
+    "responseTime": "34.68s",
+    "tokens": 242,
+    "timestamp": "2/22/2026, 3:50:12 AM"
+  },
+  {
+    "id": "a0215931-db7c-426c-a22c-ce2d9610d036",
+    "version": "0.2.4",
+    "score": 60,
+    "question": "What is the total amount of SQT tokens that have been recorded as the single highest aggregate reward amount earned by a project deployment specifically through service agreement contracts during era 36800?",
+    "responseTime": "32.52s",
+    "tokens": 196,
+    "timestamp": "2/22/2026, 3:49:25 AM"
+  },
+  {
+    "id": "219fc6f0-3175-4e38-a4e4-103cc7c3931d",
+    "version": "0.2.4",
+    "score": 251,
+    "question": "What is the total amount of SQT tokens that have been distributed as rewards to delegators by the indexer that has recorded the highest current capacity for receiving new delegations in the network?",
+    "responseTime": "9.31s",
+    "tokens": 241,
+    "timestamp": "2/22/2026, 3:40:15 AM"
+  },
+  {
+    "id": "689e986e-2b4c-4387-98cd-9087513662ac",
+    "version": "0.2.4",
+    "score": 0,
+    "question": "What is the total amount of SQT tokens currently held as a remaining delegation capacity across the three network operators who have the lowest recorded commission rates in the current era?",
+    "responseTime": "9.29s",
+    "tokens": 241,
+    "timestamp": "2/22/2026, 3:18:49 AM"
+  },
+  {
+    "id": "37bb527a-e806-411b-8a74-7cd9aecefcf8",
+    "version": "0.2.4",
+    "score": 60,
+    "question": "What is the total amount of SQT tokens that was recorded as the single highest aggregate reward amount earned by a project deployment specifically through flexible plan services during era 34200?",
+    "responseTime": "68.12s",
+    "tokens": 241,
+    "timestamp": "2/22/2026, 3:15:26 AM"
+  },
+  {
+    "id": "55a37e9b-8b65-494d-971a-20f7f2aae272",
+    "version": "0.2.4",
+    "score": 251,
+    "question": "What is the total amount of SQT tokens currently allocated as service provider stake for the project deployment QmbmoPYVnJ8sh7mJRBS4dJGQM8nndufE32oNAoQaKxhwVH?",
+    "responseTime": "32.91s",
+    "tokens": 241,
+    "timestamp": "2/22/2026, 3:09:07 AM"
+  },
+  {
+    "id": "c7114c78-86bd-4ac3-8be2-001bc48634cc",
+    "version": "0.2.4",
+    "score": 0,
+    "question": "What is the total amount of SQT tokens currently recorded as the net balance of all rewards earned across every service deployment by the single network operator that has the highest recorded total annualized percentage yield in the most recent era?",
+    "responseTime": "17.18s",
+    "tokens": 239,
+    "timestamp": "2/22/2026, 2:47:57 AM"
+  },
+  {
+    "id": "982a9f09-5a1f-40d2-bb3f-07a84779515d",
+    "version": "0.2.4",
+    "score": 60,
+    "question": "What is the total amount of SQT tokens currently recorded as the single highest aggregate reward amount earned by a network operator specifically from stake allocations to their project deployments during era 33500?",
+    "responseTime": "47.69s",
+    "tokens": 240,
+    "timestamp": "2/22/2026, 2:43:00 AM"
+  },
+  {
+    "id": "8cf0dcc0-2dec-4de3-9148-c79d3958aa00",
+    "version": "0.2.4",
+    "score": 2,
+    "question": "What is the total amount of SQT tokens that has been recorded as the combined sum of all rewards ever earned from stake allocations by the indexing project deployment that has the highest recorded volume of total rewarded query services delivered through",
+    "responseTime": "5.76s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 2:39:29 AM"
+  },
+  {
+    "id": "2589528b-745c-4db7-837f-4be090725f95",
+    "version": "0.2.4",
+    "score": 251,
+    "question": "What is the total amount of SQT tokens that have been managed as query spending for the single service agreement that has recorded the highest locked payment amount in the network?",
+    "responseTime": "14.99s",
+    "tokens": 240,
+    "timestamp": "2/22/2026, 2:37:02 AM"
+  },
+  {
+    "id": "688dda34-f8f2-42d5-9fe3-4da71d32afe4",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "Across all deployment allocations, what is the maximum net allocated amount (additions minus removals) currently recorded?",
+    "responseTime": "135.09s",
+    "tokens": 0,
+    "timestamp": "2/22/2026, 2:32:01 AM"
+  },
+  {
+    "id": "172cd9de-f461-4db8-9294-e9f57cc9fdec",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the sum of totalBoost across all projects?",
+    "responseTime": "79.22s",
+    "tokens": 0,
+    "timestamp": "2/22/2026, 2:25:50 AM"
+  },
+  {
+    "id": "f4b6504d-01e4-4323-ba0d-ec4225c887ac",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total amount of rewards claimed across all time?",
+    "responseTime": "46.37s",
+    "tokens": 0,
+    "timestamp": "2/22/2026, 2:23:37 AM"
+  },
+  {
+    "id": "ceff1fa6-036c-480f-9996-c9db138904da",
+    "version": "0.2.4",
+    "score": 2,
+    "question": "What is the total amount of SQT tokens that was recorded as the single highest aggregate reward amount earned by a network operator specifically from performing query services for their deployments across all distributions in era 19400?",
+    "responseTime": "12.32s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 2:19:58 AM"
+  },
+  {
+    "id": "f1445fee-9943-4881-ac57-915de713eddc",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "How many indexers are currently active?",
+    "responseTime": "68.29s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 2:18:52 AM"
+  },
+  {
+    "id": "5d5889ad-ddcc-4eee-b15a-e6689168ed5d",
+    "version": "0.2.4",
+    "score": 2,
+    "question": "What is the total amount of SQT tokens that have been distributed as rewards to the indexer that has recorded the highest cumulative amount of burnt rewards due to penalties across all of its deployment allocations?",
+    "responseTime": "11.37s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 2:17:32 AM"
+  },
+  {
+    "id": "846eb9ed-844b-4fd3-a55b-f668a4e86427",
+    "version": "0.2.4",
+    "score": 0,
+    "question": "What is the total amount of SQT tokens currently recorded as the circulating supply in the network?",
+    "responseTime": "8.75s",
+    "tokens": 240,
+    "timestamp": "2/22/2026, 2:17:02 AM"
+  },
+  {
+    "id": "174c4940-f3d0-48e4-8e70-cbde9c161d83",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total supply of the SQT token?",
+    "responseTime": "28.40s",
+    "tokens": 0,
+    "timestamp": "2/22/2026, 2:16:48 AM"
+  },
+  {
+    "id": "6808ae14-962c-4736-8dc2-32549121b383",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total rewards earned by all projects combined?",
+    "responseTime": "47.93s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 2:14:50 AM"
+  },
+  {
+    "id": "122fb219-40e3-4a18-9ba0-0269e8594daf",
+    "version": "0.2.4",
+    "score": 2,
+    "question": "What is the total amount of SQT tokens that have been recorded as the single highest aggregate reward amount earned by a network operator specifically from service agreements for their deployments across all distributions in era 15400?",
+    "responseTime": "13.63s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 2:12:50 AM"
+  },
+  {
+    "id": "55678412-5707-499b-acb3-67a1aba3fa23",
+    "version": "0.2.4",
+    "score": 60,
+    "question": "What is the total amount of SQT tokens that was recorded as the single highest aggregate reward amount earned by a project deployment specifically through stake allocations during era 32400?",
+    "responseTime": "44.80s",
+    "tokens": 240,
+    "timestamp": "2/22/2026, 2:10:44 AM"
+  },
+  {
+    "id": "36517d62-db8a-4294-bcb1-340dc4bd90d1",
+    "version": "0.2.4",
+    "score": 2,
+    "question": "What is the total amount of SQT tokens that was recorded as the single highest aggregate reward amount earned by a network operator specifically from performing query services for their deployments across all distributions in era 11200?",
+    "responseTime": "17.57s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 2:10:28 AM"
+  },
+  {
+    "id": "83845512-2fec-4e6a-a390-99bb3d8dbda4",
+    "version": "0.2.4",
+    "score": 251,
+    "question": "What is the total amount of SQT tokens that have been accumulated as rewards by the indexer that has completed the highest total amount of labor for project deployments across all eras?",
+    "responseTime": "12.64s",
+    "tokens": 240,
+    "timestamp": "2/22/2026, 2:05:51 AM"
+  },
+  {
+    "id": "9d01ce88-fbfc-4782-a119-cf3fa1a2ecd4",
+    "version": "0.2.4",
+    "score": 2,
+    "question": "What is the total amount of SQT tokens currently allocated as the single highest aggregate reward amount earned by a network operator specifically from service agreements for their deployments during era 16400?",
+    "responseTime": "22.68s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 2:05:25 AM"
+  },
+  {
+    "id": "40d52c69-bcc0-4780-a3c2-745fe944edf9",
+    "version": "0.2.4",
+    "score": 2,
+    "question": "What is the total amount of SQT tokens that was recorded as the single highest aggregate reward amount earned by a network operator specifically from performing query services for their deployments across all distributions in era 19400?",
+    "responseTime": "64.02s",
+    "tokens": 0,
+    "timestamp": "2/22/2026, 2:00:47 AM"
+  },
+  {
+    "id": "a386d8c3-c3a2-468f-bc2e-3821bed89428",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total amount spent on consumer queries across all deployments?",
+    "responseTime": "82.31s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 1:58:56 AM"
+  },
+  {
+    "id": "e96a2f33-e377-4388-a63e-8ea4d2a7d2b5",
+    "version": "0.2.4",
+    "score": 2,
+    "question": "What is the total amount of tokens collectively earned as commission rewards by the three network operators who have recorded the highest cumulative volumes of burnt rewards due to penalties or slashing?",
+    "responseTime": "41.76s",
+    "tokens": 0,
+    "timestamp": "2/22/2026, 1:57:39 AM"
+  },
+  {
+    "id": "b24ce594-4601-4bb2-b785-abe153b3eb83",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the maximum totalBoost value among all projects?",
+    "responseTime": "107.96s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 1:54:55 AM"
+  },
+  {
+    "id": "72b7e561-0a64-4e7f-8fad-7f18884c93ef",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total boost funding allocated across all projects?",
+    "responseTime": "68.75s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 1:51:46 AM"
+  },
+  {
+    "id": "a43fd228-67c7-4da1-9522-083377215011",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total amount of rewards earned by all projects combined?",
+    "responseTime": "123.42s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 1:49:06 AM"
+  },
+  {
+    "id": "08b07abb-3e69-424b-b43f-b5aaddacd06e",
+    "version": "0.2.4",
+    "score": 0,
+    "question": "What is the total amount of SQT tokens that have been recorded as the combined sum of all rewards ever earned from serving query services by the three network project deployments that have the highest recorded count of unique consumers who have maintained",
+    "responseTime": "23.28s",
+    "tokens": 240,
+    "timestamp": "2/22/2026, 1:46:30 AM"
+  },
+  {
+    "id": "220e36a5-32a1-45dc-99a7-cf148879e6de",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total amount of rewards distributed across all eras in the network?",
+    "responseTime": "84.04s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 1:45:30 AM"
+  },
+  {
+    "id": "49041610-c57f-4d9c-ab0a-1ba87257aea3",
+    "version": "0.2.3",
+    "score": 2,
+    "question": "What is the total number of deployments in the network?",
+    "responseTime": "66.95s",
+    "tokens": 1,
+    "timestamp": "2/22/2026, 1:41:20 AM"
+  }
+]
