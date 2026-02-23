@@ -9,6 +9,9 @@ httpx>=0.25.0
 # GraphQL
 graphql-core>=3.2.0
 
+# LLM Client
+openai>=1.0.0
+
 # Vector Database & Embeddings
 qdrant-client>=1.6.0
 sentence-transformers>=2.2.0
@@ -22,14 +25,11 @@ bitsandbytes>=0.41.0
 peft>=0.6.0
 trl>=0.7.0
 
-# vLLM for inference
-vllm>=0.6.0
-
 # Unsloth for fine-tuning (optional - requires GPU)
 # unsloth @ git+https://github.com/unslothai/unsloth.git
 
-# Bittensor (for subnet integration)
-bittensor>=6.0.0
+# vLLM for inference (optional - requires GPU)
+# vllm>=0.6.0
 
 # Utilities
 python-dotenv>=1.0.0
