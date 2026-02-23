@@ -23,6 +23,10 @@ from typing import List, Dict
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Load .env file
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent / ".env")
+
 from src.llm.llm_client import get_llm, LLMProvider, LLMConfig
 from src.agent.enhanced_graphql_agent import EnhancedGraphQLAgent, FEW_SHOT_EXAMPLES
 
