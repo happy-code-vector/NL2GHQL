@@ -405,7 +405,11 @@ async def test_dataset(
         print("-" * 70)
 
         # Retrieve context
-        context = indexer.get_context(question, top_k=5)
+        # Use correct method name for Weaviate
+        if hasattr(indexer, 'get_schema_context'):
+            context = indexer.get_schema_context(question, top_k=5)
+        else:
+            context = indexer.get_context(question, top_k=5)
 
         # Generate query
         try:
