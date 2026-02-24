@@ -16,8 +16,9 @@ import sys
 import json
 import asyncio
 import argparse
+import re
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -26,6 +27,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from graphql import parse, GraphQLSyntaxError
 
 
 # --- Simple In-Memory Schema Indexer ---
@@ -222,10 +224,69 @@ query {
 """
 
 
-async def generate_query(llm, question: str, schema_context: str) -> str:
-    """Generate GraphQL query using LLM"""
+def validate_graphql(query: str) -> Tuple[bool, Optional[str]]:
+    """Validate GraphQL syntax"""
+    try:
+        # Extract GraphQL from markdown code block if present
+        if "```graphql" in query:
+            match = re.search(r'```graphql\s*(.*?)\s*```', query, re.DOTALL)
+            if match:
+                query = match.group(1)
+        elif "```" in query:
+            match = re.search(r'```\s*(.*?)\s*```', query, re.DOTALL)
+            if match:
+                query = match.group(1)
 
-    prompt = f"""You are a GraphQL query generator for a blockchain indexing service.
+        # Try to parse
+        parse(query.strip())
+        return True, None
+    except GraphQLSyntaxError as e:
+        return False, f"Syntax error at line {e.line}: {e.message}"
+    except Exception as e:
+        return False, str(e)
+
+
+def extract_graphql(response: str) -> str:
+    """Extract clean GraphQL query from LLM response"""
+    # Try to find graphql code block
+    if "```graphql" in response:
+        match = re.search(r'```graphql\s*(.*?)\s*```', response, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+
+    # Try to find any code block
+    if "```" in response:
+        match = re.search(r'```\s*(.*?)\s*```', response, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+
+    # Return as-is
+    return response.strip()
+
+
+async def generate_query(llm, question: str, schema_context: str, max_retries: int = 2) -> Tuple[str, bool, List[str]]:
+    """
+    Generate GraphQL query with validation and retry.
+
+    Returns:
+        (query, is_valid, errors)
+    """
+    errors = []
+    query = ""
+
+    for attempt in range(max_retries + 1):
+        # Adjust prompt based on attempt
+        retry_hint = ""
+        if attempt > 0 and errors:
+            retry_hint = f"""
+
+## Previous Error (fix this):
+{errors[-1]}
+
+## Important
+Fix the syntax error and generate a valid GraphQL query."""
+
+        prompt = f"""You are a GraphQL query generator for a blockchain indexing service.
 
 Generate a valid GraphQL query based on the question and schema context.
 
@@ -236,6 +297,7 @@ Generate a valid GraphQL query based on the question and schema context.
 
 ## Question
 {question}
+{retry_hint}
 
 ## GraphQL Query
 Generate only the GraphQL query (no explanation):
@@ -243,8 +305,20 @@ Generate only the GraphQL query (no explanation):
 ```graphql
 """
 
-    response = await llm.generate_async(prompt)
-    return response
+        response = await llm.generate_async(prompt)
+        query = extract_graphql(response)
+
+        # Validate
+        is_valid, error = validate_graphql(query)
+        if is_valid:
+            return query, True, errors
+
+        errors.append(error)
+        if attempt < max_retries:
+            print(f"    [Retry {attempt + 1}/{max_retries}] Validation failed: {error[:60]}...")
+
+    # Return last attempt even if invalid
+    return query, False, errors
 
 
 async def test_pipeline(
@@ -312,12 +386,17 @@ async def test_pipeline(
     from src.llm.llm_client import get_llm
     llm = get_llm()
 
-    query = await generate_query(llm, question, context)
+    query, is_valid, errors = await generate_query(llm, question, context)
 
     print("\n" + "=" * 70)
     print("Generated GraphQL Query:")
     print("=" * 70)
-    print(query)
+    if is_valid:
+        print(f"[VALID] {query}")
+    else:
+        print(f"[INVALID] {query}")
+        if errors:
+            print(f"\nValidation errors: {errors}")
 
     # Close Weaviate connection if used
     if use_weaviate and hasattr(indexer, 'close'):
@@ -411,16 +490,21 @@ async def test_dataset(
         else:
             context = indexer.get_context(question, top_k=5)
 
-        # Generate query
+        # Generate query with validation and retry
         try:
-            query = await generate_query(llm, question, context)
+            query, is_valid, val_errors = await generate_query(llm, question, context)
             results.append({
                 'question': question,
                 'expected_score': expected_score,
                 'query': query,
+                'is_valid': is_valid,
+                'validation_errors': val_errors if val_errors else None,
                 'success': True
             })
-            print(f"Generated Query:\n{query[:500]}...")
+            status = "[VALID]" if is_valid else "[INVALID]"
+            print(f"Generated Query {status}:\n{query[:500]}...")
+            if not is_valid and val_errors:
+                print(f"  Validation errors: {val_errors[-1] if val_errors else 'None'}")
         except Exception as e:
             print(f"ERROR: {e}")
             results.append({
