@@ -344,7 +344,12 @@ def validate_graphql_syntax(query: str) -> Tuple[bool, Optional[str]]:
         parse(query.strip())
         return True, None
     except GraphQLSyntaxError as e:
-        return False, f"Syntax error at line {e.line}: {e.message}"
+        # GraphQLSyntaxError has locations attribute with line/column info
+        loc_info = ""
+        if hasattr(e, 'locations') and e.locations:
+            loc = e.locations[0]
+            loc_info = f" at line {loc.line}, column {loc.column}"
+        return False, f"Syntax error{loc_info}: {e.message}"
     except Exception as e:
         return False, str(e)
 

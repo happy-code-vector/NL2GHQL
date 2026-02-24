@@ -160,7 +160,8 @@ class WeaviateSchemaIndexer:
         query: str,
         top_k: int = 5,
         alpha: float = 0.5,
-        project: Optional[str] = None
+        project: Optional[str] = None,
+        rerank: bool = True
     ) -> List[Dict]:
         """
         Hybrid search combining BM25 (keyword) and vector (semantic) search.
@@ -170,6 +171,7 @@ class WeaviateSchemaIndexer:
             top_k: Number of results
             alpha: Weight for vector vs BM25 (0.5 = equal, 0.0 = keyword only, 1.0 = semantic only)
             project: Optional project filter
+            rerank: Apply reranking to boost simpler type name matches
 
         Returns:
             List of search results with scores
@@ -187,6 +189,9 @@ class WeaviateSchemaIndexer:
         if self._local_embedder:
             query_vector = self._local_embedder.encode(query).tolist()
 
+        # Fetch more results for reranking
+        fetch_k = top_k * 3 if rerank else top_k
+
         # Hybrid search
         if query_vector:
             # Manual hybrid: vector + BM25
@@ -194,7 +199,7 @@ class WeaviateSchemaIndexer:
                 query=query,
                 vector=query_vector,
                 alpha=alpha,
-                limit=top_k,
+                limit=fetch_k,
                 filters=filters,
                 return_metadata=MetadataQuery(score=True, explain_score=True)
             )
@@ -203,7 +208,7 @@ class WeaviateSchemaIndexer:
             response = collection.query.hybrid(
                 query=query,
                 alpha=alpha,
-                limit=top_k,
+                limit=fetch_k,
                 filters=filters,
                 return_metadata=MetadataQuery(score=True, explain_score=True)
             )
@@ -221,7 +226,99 @@ class WeaviateSchemaIndexer:
                 "explain": obj.metadata.explain_score if hasattr(obj.metadata, 'explain_score') else None
             })
 
-        return results
+        # Rerank: boost simpler type names that match query terms
+        if rerank and results:
+            results = self._rerank_by_type_name(query, results)
+
+        return results[:top_k]
+
+    def _rerank_by_type_name(self, query: str, results: List[Dict]) -> List[Dict]:
+        """
+        Rerank results to boost types with simpler names that match query keywords.
+
+        For example, if query mentions "indexer rewards", boost:
+        - IndexerReward (simple, direct match)
+        Over:
+        - IndexerAllocationRewardSummary (complex, has extra words)
+        """
+        # Extract key terms from query (lowercase, remove common words)
+        stop_words = {'what', 'which', 'how', 'many', 'the', 'a', 'an', 'is', 'are', 'of',
+                      'all', 'across', 'for', 'has', 'have', 'been', 'currently', 'total',
+                      'amount', 'highest', 'lowest', 'first', 'last', 'three', 'five'}
+
+        query_terms = set()
+        for word in query.lower().split():
+            # Clean word
+            clean = ''.join(c for c in word if c.isalnum())
+            if clean and clean not in stop_words and len(clean) > 2:
+                query_terms.add(clean)
+
+        # Score each result
+        scored_results = []
+        for r in results:
+            name = r.get('name', '')
+            name_lower = name.lower()
+
+            # Base score from hybrid search
+            base_score = r.get('score', 0)
+
+            # Calculate type name match bonus
+            bonus = 0
+            penalty = 0  # Direct penalty multiplier (0-1)
+
+            # Check how many query terms match the type name
+            matched_terms = 0
+            for term in query_terms:
+                if term in name_lower:
+                    matched_terms += 1
+
+            # Simplicity bonus: prefer shorter names with same matches
+            # e.g., "IndexerReward" vs "IndexerAllocationRewardSummary"
+            if matched_terms > 0:
+                # Base bonus for matching terms
+                bonus = matched_terms * 0.3
+
+                # Count camelCase words
+                words_in_name = len(re.findall(r'[A-Z][a-z]+', name))
+                extra_words = max(0, words_in_name - matched_terms)
+
+                # Simplicity factor: penalize extra words
+                simplicity_factor = 1.0 / (1 + extra_words * 0.2)
+
+                # Heavy DIRECT penalties for derived/aggregate types
+                # These are applied as multipliers to reduce the score directly
+                if 'summary' in name_lower:
+                    penalty += 0.5  # Summary types are pre-aggregated - 50% penalty
+                if 'allocation' in name_lower and 'reward' in name_lower:
+                    penalty += 0.4  # Allocation-specific types - 40% penalty
+                if 'aggregates' in name_lower:
+                    penalty += 0.6  # Aggregate types - 60% penalty
+                if '_enum' in name_lower:
+                    penalty += 0.3  # Enum types - 30% penalty
+
+                # Boost for exact base type match (e.g., "IndexerReward" for query "indexer rewards")
+                expected_base_name = ''.join(t.capitalize() for t in query_terms if t in name_lower)
+                if expected_base_name and expected_base_name == name:
+                    bonus += 0.5  # Strong boost for exact base type match
+
+                bonus *= simplicity_factor
+
+            # Apply both bonus and penalty
+            # penalty is additive to reduce score: score * (1 - penalty)
+            penalty_factor = max(0.1, 1 - penalty)  # Don't reduce below 10% of original
+            final_score = base_score * (1 + bonus) * penalty_factor
+
+            r_copy = r.copy()
+            r_copy['score'] = final_score
+            r_copy['original_score'] = base_score
+            r_copy['rerank_bonus'] = bonus
+            r_copy['rerank_penalty'] = penalty
+            scored_results.append(r_copy)
+
+        # Sort by final score
+        scored_results.sort(key=lambda x: x['score'], reverse=True)
+
+        return scored_results
 
     def bm25_search(self, query: str, top_k: int = 5) -> List[Dict]:
         """Pure keyword search (BM25)"""
