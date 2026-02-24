@@ -1,4 +1,4 @@
 """GraphQL agent components"""
-from .graphql_agent import HermesGraphQLAgent, GraphQLExecutor, AgentResponse
+from .enhanced_graphql_agent import EnhancedGraphQLAgent, QueryIntent
 
-__all__ = ["HermesGraphQLAgent", "GraphQLExecutor", "AgentResponse"]
+__all__ = ["EnhancedGraphQLAgent", "QueryIntent"]
