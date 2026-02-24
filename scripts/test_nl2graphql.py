@@ -319,6 +319,10 @@ async def test_pipeline(
     print("=" * 70)
     print(query)
 
+    # Close Weaviate connection if used
+    if use_weaviate and hasattr(indexer, 'close'):
+        indexer.close()
+
     return query
 
 
