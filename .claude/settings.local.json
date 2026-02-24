@@ -5,7 +5,8 @@
       "Bash(pip install:*)",
       "Bash(curl:*)",
       "Bash(docker:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(find . -name \"*.py\" -exec grep -l \"miner.*service\\\\|FastAPI\\\\|app.*run\" {} ;)"
     ]
   }
 }
