@@ -6,11 +6,33 @@ Implements:
 2. Schema-aware RAG via Weaviate hybrid search
 3. Safety boundaries for sensitive fields
 4. Direct query generation (no intermediate intent extraction)
+5. Query execution with proper headers for SubQuery endpoint
 """
 
 import re
 import json
 from typing import Optional, Dict, Any, Tuple
+
+
+# --- SubQuery Endpoint Headers ---
+
+SUBQUERY_HEADERS = {
+    'accept': 'application/json, multipart/mixed',
+    'accept-language': 'en-US,en;q=0.9',
+    'content-type': 'application/json',
+    'origin': 'https://hermes.subquery.network',
+    'referer': 'https://hermes.subquery.network/',
+    'sec-ch-ua': '"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'cross-site',
+    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
+    'x-endpoint': 'ask_mltn6ciom666gooh4vlxg9rwnbv20g'
+}
+
+SUBQUERY_ENDPOINT = "https://index-api.onfinality.io/sq/subquery/subquery-mainnet"
 
 
 # --- Few-Shot Examples ---
@@ -196,7 +218,9 @@ class EnhancedGraphQLAgent:
         endpoint: str,
         protocol: str = "subql",
         block_height: Optional[int] = None,
-        schema_context_k: int = 5
+        schema_context_k: int = 5,
+        headers: Optional[Dict[str, str]] = None,
+        timeout: float = 30.0
     ) -> Dict[str, Any]:
         """
         Main entry point - simplified pipeline:
@@ -206,6 +230,15 @@ class EnhancedGraphQLAgent:
         4. Validate generated query
         5. Execute query (if endpoint provided)
         6. Generate answer
+
+        Args:
+            question: Natural language question
+            endpoint: GraphQL endpoint URL (pass True or SUBQUERY_ENDPOINT for real endpoint)
+            protocol: GraphQL protocol type
+            block_height: Optional block height for time-travel queries
+            schema_context_k: Number of schema chunks to retrieve
+            headers: Custom headers for the request (uses SUBQUERY_HEADERS if endpoint matches)
+            timeout: Request timeout in seconds
         """
         import time
         start_time = time.time()
@@ -256,12 +289,23 @@ class EnhancedGraphQLAgent:
 
             # Step 5: Execute query if endpoint provided
             if endpoint:
+                # Handle endpoint as boolean (use default SubQuery endpoint)
+                if endpoint is True:
+                    endpoint = SUBQUERY_ENDPOINT
+
+                # Use SubQuery headers if endpoint matches or no custom headers provided
+                request_headers = headers
+                if request_headers is None and (endpoint == SUBQUERY_ENDPOINT or "onfinality.io" in endpoint):
+                    request_headers = SUBQUERY_HEADERS
+                elif request_headers is None:
+                    request_headers = {"Content-Type": "application/json"}
+
                 import httpx
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=timeout) as client:
                     response = await client.post(
                         endpoint,
                         json={"query": query},
-                        headers={"Content-Type": "application/json"}
+                        headers=request_headers
                     )
                     response.raise_for_status()
                     data = response.json()

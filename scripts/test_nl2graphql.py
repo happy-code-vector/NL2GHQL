@@ -1,5 +1,5 @@
 """
-Test NL2GraphQL Pipeline: RAG + Query Generation
+Test NL2GraphQL Pipeline: RAG + Query Generation + Execution + Answer Generation
 
 Usage:
     # Single question (in-memory, no Docker needed)
@@ -8,11 +8,14 @@ Usage:
     # Use Weaviate (requires Docker, but faster after first index)
     python scripts/test_nl2graphql.py --question "What is the total stake?" --use-weaviate
 
-    # Test with dataset
+    # Test with dataset (no execution)
     python scripts/test_nl2graphql.py --dataset full_dataset.json --limit 5
 
-    # Execute query against endpoint
-    python scripts/test_nl2graphql.py --question "What is the total stake?" --endpoint https://api.example.com/graphql
+    # Full test with real endpoint (execute queries and generate answers)
+    python scripts/test_nl2graphql.py --dataset full_dataset.json --endpoint
+
+    # Full test with Weaviate and real endpoint
+    python scripts/test_nl2graphql.py --dataset full_dataset.json --use-weaviate --endpoint --limit 10
 """
 
 import sys
@@ -21,13 +24,13 @@ import asyncio
 import argparse
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Set
+from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-import httpx
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from graphql import parse, validate, build_schema, GraphQLSyntaxError
@@ -40,26 +43,21 @@ class SchemaValidator:
 
     def __init__(self):
         self.schema = None
-        self.field_index: Dict[str, Set[str]] = {}  # type_name -> set of field names
+        self.field_index: Dict[str, Set[str]] = {}
 
     def load_schema(self, schema_path: str) -> bool:
         """Load schema from JSON introspection or GraphQL SDL file"""
         try:
-            # Try GraphQL SDL first
             if schema_path.endswith('.graphql'):
                 with open(schema_path, 'r', encoding='utf-8') as f:
                     sdl = f.read()
                 self.schema = build_schema(sdl)
             else:
-                # Load from JSON introspection
                 with open(schema_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-
-                # Convert introspection result to SDL
                 sdl = self._introspection_to_sdl(data)
                 self.schema = build_schema(sdl)
 
-            # Build field index for quick lookup
             self._build_field_index()
             return True
 
@@ -84,7 +82,6 @@ class SchemaValidator:
             name = type_info.get('name', '')
             kind = type_info.get('kind', '')
 
-            # Skip introspection types
             if name.startswith('__'):
                 continue
 
@@ -173,12 +170,10 @@ class SchemaValidator:
     def validate(self, query: str) -> Tuple[bool, Optional[str]]:
         """Validate query against schema"""
         if not self.schema:
-            return True, None  # No schema loaded, skip validation
+            return True, None
 
         try:
             document = parse(query)
-
-            # Validate against schema
             errors = validate(self.schema, document)
 
             if errors:
@@ -193,32 +188,6 @@ class SchemaValidator:
             return False, f"Syntax error at line {e.line}: {e.message}"
         except Exception as e:
             return False, str(e)
-
-    def check_fields_exist(self, query: str) -> Tuple[bool, List[str]]:
-        """Check if all fields in query exist in schema (lighter check)"""
-        missing = []
-        try:
-            doc = parse(query)
-            # Walk the AST and check field names
-            for definition in doc.definitions:
-                if hasattr(definition, 'selection_set'):
-                    self._check_selection_set(definition.selection_set, missing)
-            return len(missing) == 0, missing
-        except:
-            return True, []  # Parse error, skip check
-
-    def _check_selection_set(self, selection_set, missing: List[str]):
-        """Recursively check selection set fields"""
-        if not selection_set:
-            return
-        for selection in selection_set.selections:
-            if hasattr(selection, 'name'):
-                field_name = selection.name.value
-                # Skip common fields that might not be indexed
-                if field_name in ['nodes', 'edges', 'totalCount', 'pageInfo']:
-                    pass
-            if hasattr(selection, 'selection_set'):
-                self._check_selection_set(selection.selection_set, missing)
 
 
 # --- Simple In-Memory Schema Indexer ---
@@ -250,7 +219,6 @@ class SimpleSchemaIndexer:
             name = type_info.get('name', '')
             kind = type_info.get('kind', '')
 
-            # Skip introspection types and scalars
             if name.startswith('__') or name in ['Boolean', 'String', 'Int', 'Float', 'ID']:
                 continue
 
@@ -258,7 +226,6 @@ class SimpleSchemaIndexer:
             enum_values = type_info.get('enumValues', [])
             description = type_info.get('description', '') or ''
 
-            # Build definition
             if kind == 'ENUM' and enum_values:
                 field_names = [e.get('name', '') if isinstance(e, dict) else str(e) for e in enum_values]
                 definition = f"enum {name} {{ " + " ".join(field_names) + " }"
@@ -298,7 +265,6 @@ class SimpleSchemaIndexer:
             else:
                 continue
 
-            # Create searchable text
             text_parts = []
             if description:
                 text_parts.append(f"Description: {description}")
@@ -316,7 +282,6 @@ class SimpleSchemaIndexer:
                 'text': "\n".join(text_parts)
             })
 
-        # Create embeddings
         if self.chunks:
             texts = [c['text'] for c in self.chunks]
             self.embeddings = self.encoder.encode(texts, show_progress_bar=True)
@@ -324,7 +289,6 @@ class SimpleSchemaIndexer:
         return len(self.chunks)
 
     def _type_to_str(self, type_info: Dict) -> str:
-        """Convert type dict to string"""
         if not type_info:
             return "Unknown"
         kind = type_info.get('kind', '')
@@ -337,7 +301,6 @@ class SimpleSchemaIndexer:
         return name
 
     def search(self, query: str, top_k: int = 5) -> List[Dict]:
-        """Search for relevant schema chunks"""
         if not self.chunks or self.embeddings is None:
             return []
 
@@ -361,7 +324,6 @@ class SimpleSchemaIndexer:
         return results
 
     def get_schema_context(self, query: str, top_k: int = 5) -> str:
-        """Get schema context for query (interface matching agent requirements)"""
         results = self.search(query, top_k)
         parts = []
         for r in results:
@@ -371,7 +333,6 @@ class SimpleSchemaIndexer:
             parts.append("")
         return "\n".join(parts)
 
-    # Keep old method for backwards compatibility
     def get_context(self, query: str, top_k: int = 5) -> str:
         return self.get_schema_context(query, top_k)
 
@@ -379,7 +340,6 @@ class SimpleSchemaIndexer:
 # --- Query Syntax Validator ---
 
 def validate_graphql_syntax(query: str) -> Tuple[bool, Optional[str]]:
-    """Validate GraphQL syntax only"""
     try:
         parse(query.strip())
         return True, None
@@ -389,86 +349,52 @@ def validate_graphql_syntax(query: str) -> Tuple[bool, Optional[str]]:
         return False, str(e)
 
 
-# --- Query Executor ---
-
-async def execute_query(query: str, endpoint: str, timeout: float = 30.0) -> Tuple[bool, Optional[Dict], Optional[str]]:
-    """Execute GraphQL query against endpoint"""
-    try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(
-                endpoint,
-                json={"query": query},
-                headers={"Content-Type": "application/json"}
-            )
-            response.raise_for_status()
-            data = response.json()
-
-            if "errors" in data:
-                error_msgs = []
-                for err in data["errors"]:
-                    error_msgs.append(err.get("message", str(err)))
-                return False, data, "; ".join(error_msgs)
-
-            return True, data.get("data"), None
-
-    except httpx.TimeoutException:
-        return False, None, "Request timed out"
-    except httpx.HTTPStatusError as e:
-        return False, None, f"HTTP error: {e.response.status_code}"
-    except Exception as e:
-        return False, None, str(e)
-
-
-# --- Test Pipeline using EnhancedGraphQLAgent ---
+# --- Test Pipeline ---
 
 async def test_pipeline(
     schema_path: str,
     question: str,
     top_k: int = 5,
     use_weaviate: bool = False,
-    endpoint: Optional[str] = None
+    execute: bool = False
 ):
-    """Test the full pipeline for a single question using EnhancedGraphQLAgent"""
+    """Test the full pipeline for a single question"""
 
     print("=" * 70)
     print("NL2GraphQL Pipeline Test")
+    if execute:
+        from src.agent.enhanced_graphql_agent import SUBQUERY_ENDPOINT
+        print(f"Endpoint: {SUBQUERY_ENDPOINT}")
     print("=" * 70)
 
     # Load schema validator
     schema_validator = SchemaValidator()
-    if schema_validator.load_schema(schema_path):
-        print("\n[0] Schema validator loaded")
-    else:
-        schema_validator = None
+    schema_validator.load_schema(schema_path)
 
     # Choose indexer
     indexer = None
     if use_weaviate:
-        print("\n[1] Using Weaviate (persistent index)...")
+        print("\n[1] Using Weaviate...")
         try:
             from src.rag.weaviate_indexer import WeaviateSchemaIndexer, parse_schema_file
             indexer = WeaviateSchemaIndexer()
 
-            # Check if collection exists and has data
             if indexer.client.collections.exists(indexer.COLLECTION_NAME):
                 collection = indexer.client.collections.get(indexer.COLLECTION_NAME)
                 result = collection.aggregate.over_all(total_count=True)
                 if result.total_count > 0:
                     print(f"    Using existing index with {result.total_count} types")
                 else:
-                    print("    Indexing schema into Weaviate...")
                     indexer.create_collection()
                     chunks = parse_schema_file(schema_path.replace('.json', '.graphql'), "subquery")
                     indexer.index_chunks(chunks)
             else:
-                print("    Creating new Weaviate index...")
                 indexer.create_collection()
                 chunks = parse_schema_file(schema_path.replace('.json', '.graphql'), "subquery")
                 indexer.index_chunks(chunks)
 
         except Exception as e:
-            print(f"    Weaviate error: {e}")
-            print("    Falling back to in-memory indexer...")
+            print(f"    Weaviate error: {e}, falling back to in-memory...")
             indexer = None
 
     if indexer is None:
@@ -477,18 +403,8 @@ async def test_pipeline(
         count = indexer.load_schema(schema_path)
         print(f"    Indexed {count} schema types")
 
-    # Show retrieved context
-    context = indexer.get_schema_context(question, top_k=top_k)
-    results = indexer.search(question, top_k=3) if hasattr(indexer, 'search') else []
-
-    print(f"\n[2] Retrieved schema context ({len(context)} chars)")
-    if results:
-        print("\n    Top schema matches:")
-        for i, r in enumerate(results[:3], 1):
-            print(f"      {i}. {r['name']} (score: {r['score']:.3f})")
-
     # Use EnhancedGraphQLAgent
-    print("\n[3] Generating GraphQL query with EnhancedGraphQLAgent...")
+    print("\n[2] Generating GraphQL query...")
     from src.agent.enhanced_graphql_agent import EnhancedGraphQLAgent
     from src.llm.llm_client import get_llm
 
@@ -496,62 +412,38 @@ async def test_pipeline(
     agent = EnhancedGraphQLAgent(
         schema_indexer=indexer,
         llm_client=llm,
-        validator=schema_validator  # Pass schema validator
+        validator=schema_validator
     )
 
-    # Generate query using agent
+    # Generate query
+    # Pass True as endpoint to use agent's built-in SubQuery endpoint
     result = await agent.answer_question(
         question=question,
-        endpoint=endpoint,  # Pass endpoint for execution
+        endpoint=True if execute else None,
         schema_context_k=top_k
     )
 
     query = result.get('query', '')
 
-    # Validate generated query (syntax)
+    # Validate
     syntax_valid, syntax_error = validate_graphql_syntax(query) if query else (False, "No query generated")
-
-    # Validate against schema
-    schema_valid = True
-    schema_error = None
-    if schema_validator and query:
-        schema_valid, schema_error = schema_validator.validate(query)
+    schema_valid, schema_error = schema_validator.validate(query) if query else (False, "No query")
 
     print("\n" + "=" * 70)
-    print("Generated GraphQL Query:")
+    print("Generated Query:")
     print("=" * 70)
-
-    # Status indicators
-    status_parts = []
-    if syntax_valid:
-        status_parts.append("SYNTAX OK")
-    else:
-        status_parts.append("SYNTAX ERROR")
-
-    if schema_validator:
-        if schema_valid:
-            status_parts.append("SCHEMA OK")
-        else:
-            status_parts.append("SCHEMA ERROR")
-
-    status = " | ".join(status_parts)
+    status = f"SYNTAX: {'OK' if syntax_valid else 'ERR'} | SCHEMA: {'OK' if schema_valid else 'ERR'}"
     print(f"[{status}]")
     print(query)
 
-    if not syntax_valid and syntax_error:
-        print(f"\nSyntax error: {syntax_error}")
-    if not schema_valid and schema_error:
-        print(f"\nSchema validation error: {schema_error}")
-
     if result.get('error'):
-        print(f"\nAgent error: {result['error']}")
+        print(f"\nError: {result['error']}")
 
-    # Show execution result if endpoint was provided
-    if endpoint and result.get('query_result'):
+    if execute and result.get('query_result'):
         print("\n" + "=" * 70)
         print("Query Result:")
         print("=" * 70)
-        print(json.dumps(result['query_result'], indent=2)[:1000])
+        print(json.dumps(result['query_result'], indent=2)[:2000])
 
     if result.get('answer'):
         print("\n" + "=" * 70)
@@ -559,63 +451,65 @@ async def test_pipeline(
         print("=" * 70)
         print(result['answer'])
 
-    # Close Weaviate connection if used
+    print(f"\nTime: {result.get('elapsed_time', 0):.2f}s")
+
     if use_weaviate and hasattr(indexer, 'close'):
         indexer.close()
 
-    return query
+    return result
 
+
+# --- Full Dataset Test ---
 
 async def test_dataset(
     schema_path: str,
     dataset_path: str,
-    limit: int = 5,
+    limit: int = 0,  # 0 = all
     use_weaviate: bool = False,
-    endpoint: Optional[str] = None
+    execute: bool = False,
+    output_file: Optional[str] = None
 ):
-    """Test pipeline with dataset using EnhancedGraphQLAgent"""
+    """Full test with dataset - complete pipeline matching real agent behavior"""
 
     print("=" * 70)
-    print("NL2GraphQL Dataset Test")
+    print("NL2GraphQL Full Dataset Test")
+    print(f"Execute queries: {execute}")
+    if execute:
+        from src.agent.enhanced_graphql_agent import SUBQUERY_ENDPOINT
+        print(f"Endpoint: {SUBQUERY_ENDPOINT}")
     print("=" * 70)
 
     # Load schema validator
     schema_validator = SchemaValidator()
     if schema_validator.load_schema(schema_path):
         print("\n[0] Schema validator loaded")
-    else:
-        schema_validator = None
 
     # Choose indexer
     indexer = None
     if use_weaviate:
-        print("\n[1] Using Weaviate (persistent index)...")
+        print("\n[1] Using Weaviate...")
         try:
             from src.rag.weaviate_indexer import WeaviateSchemaIndexer, parse_schema_file
             indexer = WeaviateSchemaIndexer()
 
-            # Check if collection exists and has data
             if indexer.client.collections.exists(indexer.COLLECTION_NAME):
                 collection = indexer.client.collections.get(indexer.COLLECTION_NAME)
                 result = collection.aggregate.over_all(total_count=True)
                 if result.total_count > 0:
                     print(f"    Using existing index with {result.total_count} types")
                 else:
-                    print("    Indexing schema into Weaviate...")
                     indexer.create_collection()
                     gql_path = schema_path.replace('.json', '.graphql')
                     chunks = parse_schema_file(gql_path, "subquery")
                     indexer.index_chunks(chunks)
             else:
-                print("    Creating new Weaviate index...")
                 indexer.create_collection()
                 gql_path = schema_path.replace('.json', '.graphql')
                 chunks = parse_schema_file(gql_path, "subquery")
                 indexer.index_chunks(chunks)
 
         except Exception as e:
-            print(f"    Weaviate error: {e}")
-            print("    Falling back to in-memory indexer...")
+            print(f"    Weaviate error: {e}, falling back...")
             indexer = None
 
     if indexer is None:
@@ -624,7 +518,6 @@ async def test_dataset(
         try:
             count = indexer.load_schema(schema_path)
         except json.JSONDecodeError:
-            print("    JSON corrupted, using GraphQL file...")
             gql_path = schema_path.replace('.json', '.graphql')
             count = indexer.load_schema(gql_path)
         print(f"    Indexed {count} schema types")
@@ -634,7 +527,8 @@ async def test_dataset(
     with open(dataset_path, 'r', encoding='utf-8') as f:
         dataset = json.load(f)
 
-    questions = dataset[:limit]
+    total_questions = len(dataset) if limit == 0 else min(limit, len(dataset))
+    questions = dataset[:total_questions] if limit > 0 else dataset
     print(f"    Testing {len(questions)} questions")
 
     # Initialize agent
@@ -649,94 +543,146 @@ async def test_dataset(
     )
 
     results = []
+    total_score = 0
+    total_expected = 0
+
     for i, item in enumerate(questions, 1):
         question = item.get('question', str(item))
         expected_score = item.get('score', 0)
+        question_id = item.get('id', str(i))
 
         print(f"\n{'='*70}")
-        print(f"[{i}/{len(questions)}] Question: {question[:80]}...")
+        print(f"[{i}/{len(questions)}] ID: {question_id}")
+        print(f"Question: {question[:100]}...")
+        print(f"Expected score: {expected_score}")
         print("-" * 70)
 
         try:
-            # Use agent to generate query
+            # Full pipeline - same as real agent
+            # Pass True as endpoint to use agent's built-in SubQuery endpoint
             result = await agent.answer_question(
                 question=question,
-                endpoint=endpoint,
+                endpoint=True if execute else None,
                 schema_context_k=5
             )
 
             query = result.get('query', '')
-            syntax_valid, syntax_error = validate_graphql_syntax(query) if query else (False, "No query generated")
+            answer = result.get('answer', '')
+            query_result = result.get('query_result')
+            error = result.get('error')
+            elapsed = result.get('elapsed_time', 0)
 
-            # Schema validation
-            schema_valid = True
-            schema_error = None
-            if schema_validator and query:
-                schema_valid, schema_error = schema_validator.validate(query)
+            # Validate
+            syntax_valid, _ = validate_graphql_syntax(query) if query else (False, None)
+            schema_valid, _ = schema_validator.validate(query) if query else (False, None)
+            exec_success = query_result is not None
 
-            # Execution result
-            exec_success = result.get('query_result') is not None if endpoint else None
+            # Calculate our score (simple heuristic for now)
+            calc_score = 0
+            if query and syntax_valid:
+                calc_score += 10
+            if schema_valid:
+                calc_score += 20
+            if exec_success:
+                calc_score += 30
+            if answer:
+                calc_score += 40
 
-            results.append({
-                'question': question,
-                'expected_score': expected_score,
-                'query': query,
-                'syntax_valid': syntax_valid,
-                'schema_valid': schema_valid,
-                'exec_success': exec_success,
-                'validation_errors': [e for e in [syntax_error, schema_error] if e],
-                'success': bool(query),
-                'elapsed_time': result.get('elapsed_time', 0)
-            })
+            total_score += calc_score
+            total_expected += expected_score
 
             # Status
             status_parts = []
-            status_parts.append("SYNTAX OK" if syntax_valid else "SYNTAX ERR")
-            if schema_validator:
-                status_parts.append("SCHEMA OK" if schema_valid else "SCHEMA ERR")
-            if endpoint:
-                status_parts.append("EXEC OK" if exec_success else "EXEC FAIL")
-
+            status_parts.append("SYN" if syntax_valid else "SYN!")
+            status_parts.append("SCH" if schema_valid else "SCH!")
+            if execute:
+                status_parts.append("EXE" if exec_success else "EXE!")
+            status_parts.append("ANS" if answer else "ANS!")
             status = " | ".join(status_parts)
+
             print(f"[{status}]")
-            print(f"{query[:500]}...")
+            print(f"Query: {query[:200]}..." if len(query) > 200 else f"Query: {query}")
 
-            if not syntax_valid and syntax_error:
-                print(f"  Syntax error: {syntax_error[:100]}")
-            if not schema_valid and schema_error:
-                print(f"  Schema error: {schema_error[:100]}")
+            if answer:
+                print(f"Answer: {answer[:200]}..." if len(answer) > 200 else f"Answer: {answer}")
 
-            print(f"  Time: {result.get('elapsed_time', 0):.2f}s")
+            if error:
+                print(f"Error: {error[:100]}")
+
+            print(f"Time: {elapsed:.2f}s | Score: {calc_score} (expected: {expected_score})")
+
+            results.append({
+                'id': question_id,
+                'question': question,
+                'expected_score': expected_score,
+                'calculated_score': calc_score,
+                'query': query,
+                'answer': answer,
+                'syntax_valid': syntax_valid,
+                'schema_valid': schema_valid,
+                'exec_success': exec_success if execute else None,
+                'has_answer': bool(answer),
+                'error': error,
+                'elapsed_time': elapsed,
+                'timestamp': datetime.now().isoformat()
+            })
 
         except Exception as e:
             print(f"ERROR: {e}")
             results.append({
+                'id': question_id,
                 'question': question,
                 'expected_score': expected_score,
-                'query': None,
-                'success': False,
-                'error': str(e)
+                'calculated_score': 0,
+                'error': str(e),
+                'success': False
             })
 
     # Summary
     print("\n" + "=" * 70)
-    print("Summary")
+    print("SUMMARY")
     print("=" * 70)
-    success_count = sum(1 for r in results if r['success'])
+
     syntax_ok = sum(1 for r in results if r.get('syntax_valid'))
-    schema_ok = sum(1 for r in results if r.get('schema_valid', True))
-    exec_ok = sum(1 for r in results if r.get('exec_success', True))
+    schema_ok = sum(1 for r in results if r.get('schema_valid'))
+    exec_ok = sum(1 for r in results if r.get('exec_success')) if execute else len(results)
+    has_answer = sum(1 for r in results if r.get('has_answer'))
     avg_time = sum(r.get('elapsed_time', 0) for r in results) / len(results) if results else 0
 
-    print(f"Generated: {success_count}/{len(results)}")
-    print(f"Syntax valid: {syntax_ok}/{len(results)}")
-    if schema_validator:
-        print(f"Schema valid: {schema_ok}/{len(results)}")
-    if endpoint:
-        print(f"Exec success: {exec_ok}/{len(results)}")
+    print(f"Total questions: {len(results)}")
+    print(f"Syntax valid: {syntax_ok}/{len(results)} ({100*syntax_ok/len(results):.1f}%)")
+    print(f"Schema valid: {schema_ok}/{len(results)} ({100*schema_ok/len(results):.1f}%)")
+    if execute:
+        print(f"Exec success: {exec_ok}/{len(results)} ({100*exec_ok/len(results):.1f}%)")
+    print(f"Has answer: {has_answer}/{len(results)} ({100*has_answer/len(results):.1f}%)")
     print(f"Avg time: {avg_time:.2f}s")
+    print(f"Total score: {total_score} / Expected: {total_expected}")
 
-    # Close Weaviate connection if used
+    # Save results
+    if output_file:
+        output_path = Path(output_file)
+    else:
+        output_path = Path(dataset_path).parent / f"test_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump({
+            'summary': {
+                'total_questions': len(results),
+                'syntax_valid': syntax_ok,
+                'schema_valid': schema_ok,
+                'exec_success': exec_ok if execute else None,
+                'has_answer': has_answer,
+                'total_score': total_score,
+                'expected_score': total_expected,
+                'avg_time': avg_time,
+                'timestamp': datetime.now().isoformat()
+            },
+            'results': results
+        }, f, indent=2)
+
+    print(f"\nResults saved to: {output_path}")
+
+    # Close connections
     if use_weaviate and hasattr(indexer, 'close'):
         indexer.close()
 
@@ -749,11 +695,14 @@ def main():
                         help="Path to schema JSON file")
     parser.add_argument("--question", "-q", help="Single question to test")
     parser.add_argument("--dataset", "-d", help="Dataset JSON file")
-    parser.add_argument("--limit", "-n", type=int, default=5, help="Number of questions to test")
-    parser.add_argument("--top-k", type=int, default=5, help="Number of schema chunks to retrieve")
+    parser.add_argument("--limit", "-n", type=int, default=0,
+                        help="Number of questions to test (0 = all)")
+    parser.add_argument("--top-k", type=int, default=5, help="Schema chunks to retrieve")
     parser.add_argument("--use-weaviate", "-w", action="store_true",
                         help="Use Weaviate (requires Docker)")
-    parser.add_argument("--endpoint", "-e", help="GraphQL endpoint URL to execute queries")
+    parser.add_argument("--endpoint", "-e", action="store_true",
+                        help="Execute queries against real SubQuery endpoint")
+    parser.add_argument("--output", "-o", help="Output file for results")
 
     args = parser.parse_args()
 
@@ -762,17 +711,22 @@ def main():
         return
 
     if args.question:
-        asyncio.run(test_pipeline(args.schema, args.question, args.top_k, args.use_weaviate, args.endpoint))
+        asyncio.run(test_pipeline(
+            args.schema, args.question, args.top_k, args.use_weaviate, args.endpoint
+        ))
     elif args.dataset:
         if not Path(args.dataset).exists():
             print(f"Error: Dataset not found: {args.dataset}")
             return
-        asyncio.run(test_dataset(args.schema, args.dataset, args.limit, args.use_weaviate, args.endpoint))
+        asyncio.run(test_dataset(
+            args.schema, args.dataset, args.limit, args.use_weaviate, args.endpoint, args.output
+        ))
     else:
-        # Default: test with a sample question
         sample_question = "What is the total stake of all indexers?"
         print("No question or dataset provided. Testing with sample question.")
-        asyncio.run(test_pipeline(args.schema, sample_question, args.top_k, args.use_weaviate, args.endpoint))
+        asyncio.run(test_pipeline(
+            args.schema, sample_question, args.top_k, args.use_weaviate, args.endpoint
+        ))
 
 
 if __name__ == "__main__":
