@@ -403,8 +403,27 @@ async def test_pipeline(
         count = indexer.load_schema(schema_path)
         print(f"    Indexed {count} schema types")
 
+    # Show retrieved schema context
+    schema_context = indexer.get_schema_context(question, top_k=top_k)
+
+    # Get search results - handle both SimpleSchemaIndexer and WeaviateSchemaIndexer
+    search_results = []
+    if hasattr(indexer, 'search'):
+        search_results = indexer.search(question, top_k=top_k)
+    elif hasattr(indexer, 'hybrid_search'):
+        search_results = indexer.hybrid_search(question, top_k=top_k)
+
+    print(f"\n[2] Retrieved schema context ({len(schema_context)} chars, {len(search_results)} types)")
+    if search_results:
+        print("    Matched types:")
+        for r in search_results:
+            score = r.get('score', 0)
+            name = r.get('name', 'unknown')
+            print(f"      - {name} (score: {score:.3f})")
+    print("    " + "-" * 62)
+
     # Use EnhancedGraphQLAgent
-    print("\n[2] Generating GraphQL query...")
+    print("\n[3] Generating GraphQL query...")
     from src.agent.enhanced_graphql_agent import EnhancedGraphQLAgent
     from src.llm.llm_client import get_llm
 
@@ -556,6 +575,29 @@ async def test_dataset(
         print(f"Question: {question[:100]}...")
         print(f"Expected score: {expected_score}")
         print("-" * 70)
+
+        # Show retrieved schema
+        schema_ctx = indexer.get_schema_context(question, top_k=5)
+        if hasattr(indexer, 'search'):
+            search_res = indexer.search(question, top_k=5)
+        elif hasattr(indexer, 'hybrid_search'):
+            search_res = indexer.hybrid_search(question, top_k=5)
+        else:
+            search_res = []
+
+        print(f"\n  Retrieved {len(search_res)} schema types:")
+        for r in search_res[:5]:
+            score = r.get('score', 0)
+            name = r.get('name', 'unknown')
+            print(f"    - {name} (score: {score:.3f})")
+
+        print("\n  Schema Context (first 1000 chars):")
+        print("  " + "-" * 66)
+        for line in schema_ctx[:1000].split('\n'):
+            print(f"  {line}")
+        if len(schema_ctx) > 1000:
+            print(f"  ... ({len(schema_ctx) - 1000} more chars)")
+        print("  " + "-" * 66)
 
         try:
             # Full pipeline - same as real agent
