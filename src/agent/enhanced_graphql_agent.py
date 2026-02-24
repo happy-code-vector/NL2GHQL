@@ -84,34 +84,102 @@ query {
 }
 ```
 
-## Example 4: Time-Travel Query (SubQL)
-Question: "What was the total stake at block 5000000?"
+## Example 4: Grouped Aggregation Query
+Question: "What is the total amount of rewards grouped by indexer?"
 Schema Context:
-  type Indexer { id: ID!, totalStake: BigInt! }
-  type Query { indexers(blockHeight: String): IndexersConnection! }
+  type IndexerReward { id: ID!, indexerId: String!, amount: BigInt! }
+  type Query { indexerRewards(first: Int): IndexerRewardsConnection! }
 GraphQL Query:
 ```graphql
 query {
-  indexers(blockHeight: "5000000", first: 10) {
-    nodes {
-      id
-      totalStake
+  indexerRewards {
+    groupedAggregates(groupBy: [INDEXER_ID]) {
+      keys
+      sum {
+        amount
+      }
     }
   }
 }
 ```
 
-## Example 5: Aggregation Query
-Question: "What is the total delegated stake across all delegations?"
+## Example 5: Nested Aggregation Query
+Question: "What is the total reward for the deployment with the highest consumer count?"
 Schema Context:
-  type Delegation { id: ID!, amount: BigInt! }
-  type Query { delegations(first: Int): DelegationsConnection! }
+  type Deployment { id: ID!, consumerQueryRewardSummaries: ConsumerQueryRewardSummaryConnection }
+  type ConsumerQueryRewardSummary { amount: BigInt! }
 GraphQL Query:
 ```graphql
 query {
-  delegations(first: 1000) {
+  deployments(first: 1, orderBy: [CONSUMER_QUERY_REWARD_SUMMARIES_DISTINCT_COUNT_CONSUMER_DESC]) {
     nodes {
-      amount
+      id
+      consumerQueryRewardSummaries {
+        aggregates {
+          sum {
+            amount
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Example 6: Filtered Aggregation with Era
+Question: "What is the total reward earned from service agreements during era 42200?"
+Schema Context:
+  type IndexerDeploymentReward { id: ID!, eraIdx: Int!, type: String!, amount: BigInt! }
+  type Query { indexerDeploymentRewards(filter: IndexerDeploymentRewardFilter): IndexerDeploymentRewardsConnection }
+GraphQL Query:
+```graphql
+query {
+  indexerDeploymentRewards(filter: { eraIdx: { equalTo: 42200 }, type: { equalTo: "SERVICE_AGREEMENT" } }) {
+    aggregates {
+      sum {
+        amount
+      }
+    }
+  }
+}
+```
+
+## Example 7: Max Aggregation Query
+Question: "What is the highest single reward amount earned by any indexer?"
+Schema Context:
+  type IndexerReward { id: ID!, amount: BigInt! }
+  type Query { indexerRewards(first: Int): IndexerRewardsConnection }
+GraphQL Query:
+```graphql
+query {
+  indexerRewards {
+    aggregates {
+      max {
+        amount
+      }
+    }
+  }
+}
+```
+
+## Example 8: Complex Nested Aggregation
+Question: "What is the total rewards for the indexer with the highest self-stake?"
+Schema Context:
+  type Indexer { id: ID!, selfStake: BigInt!, rewards: IndexerRewardConnection }
+  type IndexerReward { amount: BigInt! }
+GraphQL Query:
+```graphql
+query {
+  indexers(first: 1, orderBy: [SELF_STAKE_DESC]) {
+    nodes {
+      id
+      rewards {
+        aggregates {
+          sum {
+            amount
+          }
+        }
+      }
     }
   }
 }
@@ -146,6 +214,10 @@ Generate a valid GraphQL query for:
 - Connection types return `nodes` array and `totalCount`
 - Use `filter: {{ field: {{ operator: value }} }}` for filtering
 - Use `orderBy: [FIELD_DESC]` or `orderBy: [FIELD_ASC]` for sorting
+- For aggregations, use `aggregates {{ sum {{ field }} max {{ field }} min {{ field }} count }}` on connections
+- For grouped aggregations, use `groupedAggregates(groupBy: [FIELD1, FIELD2]) {{ keys sum {{ field }} }}`
+- Nested aggregations work on nested connections: `parent {{ childConnection {{ aggregates {{ sum {{ field }} }} }} }}`
+- Complex orderBy can use aggregate fields: `orderBy: [NESTED_CONNECTION_AGGREGATE_FIELD_DESC]`
 
 Output ONLY the GraphQL query, no explanations or markdown code blocks.
 
