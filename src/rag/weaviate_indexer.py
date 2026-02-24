@@ -412,7 +412,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Weaviate Schema Indexer")
-    parser.add_argument("--schema", required=True, help="Path to GraphQL schema file")
+    parser.add_argument("--schema", required=False, help="Path to GraphQL schema file (required for indexing)")
     parser.add_argument("--project", default=None, help="Project name")
     parser.add_argument("--weaviate-url", default="http://localhost:8080")
     parser.add_argument("--search", default=None, help="Search query (optional)")
@@ -439,7 +439,12 @@ def main():
                 print(f"  Description: {r['description'][:100]}...")
             print(f"  Fields: {', '.join(r['fields'][:5])}")
     else:
-        # Index mode
+        # Index mode - requires schema
+        if not args.schema:
+            print("Error: --schema is required for indexing mode")
+            print("Usage: python -m src.rag.weaviate_indexer --schema path/to/schema.graphql")
+            return
+
         print("Creating collection...")
         indexer.create_collection()
 

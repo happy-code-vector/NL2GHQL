@@ -57,7 +57,13 @@ class HybridSchemaIndexer:
         embedding_model: str = "all-MiniLM-L6-v2",
         embedding_dim: int = 384
     ):
-        self.client = QdrantClient(url=qdrant_url)
+        # Use gRPC for better performance and Windows compatibility
+        self.client = QdrantClient(
+            host="127.0.0.1",
+            port=6333,
+            grpc_port=6334,
+            prefer_grpc=True
+        )
         self.collection_name = collection_name
         self.encoder = SentenceTransformer(embedding_model)
         self.embedding_dim = embedding_dim
@@ -296,7 +302,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Hybrid Schema Indexer")
-    parser.add_argument("--schema", required=True, help="Path to GraphQL schema file")
+    parser.add_argument("--schema", required=False, help="Path to GraphQL schema file (required for indexing)")
     parser.add_argument("--project", default=None, help="Project name")
     parser.add_argument("--qdrant-url", default="http://localhost:6333")
     parser.add_argument("--collection", default="graphql_schema_hybrid")
@@ -316,7 +322,12 @@ def main():
         for r in results:
             print(f"  - {r['name']} (score: {r['score']:.4f})")
     else:
-        # Index mode
+        # Index mode - requires schema
+        if not args.schema:
+            print("Error: --schema is required for indexing mode")
+            print("Usage: python -m src.rag.hybrid_indexer --schema path/to/schema.graphql")
+            return
+
         indexer.create_collection()
 
         # Parse schema
