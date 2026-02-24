@@ -1,10 +1,14 @@
 """
 Test NL2GraphQL Pipeline: RAG + Query Generation
 
-No external database needed - uses in-memory vector search.
-
 Usage:
-    python scripts/test_nl2graphql.py --question "What is the total stake of all indexers?"
+    # Single question (in-memory, no Docker needed)
+    python scripts/test_nl2graphql.py --question "What is the total stake?"
+
+    # Use Weaviate (requires Docker, but faster after first index)
+    python scripts/test_nl2graphql.py --question "What is the total stake?" --use-weaviate
+
+    # Test with dataset
     python scripts/test_nl2graphql.py --dataset full_dataset.json --limit 5
 """
 
@@ -246,7 +250,8 @@ Generate only the GraphQL query (no explanation):
 async def test_pipeline(
     schema_path: str,
     question: str,
-    top_k: int = 5
+    top_k: int = 5,
+    use_weaviate: bool = False
 ):
     """Test the full pipeline for a single question"""
 
@@ -254,24 +259,55 @@ async def test_pipeline(
     print("NL2GraphQL Pipeline Test")
     print("=" * 70)
 
-    # 1. Load and index schema
-    print("\n[1] Loading schema...")
-    indexer = SimpleSchemaIndexer()
-    count = indexer.load_schema(schema_path)
-    print(f"    Indexed {count} schema types")
+    # Choose indexer
+    if use_weaviate:
+        print("\n[1] Using Weaviate (persistent index)...")
+        try:
+            from src.rag.weaviate_indexer import WeaviateSchemaIndexer, parse_schema_file
+            indexer = WeaviateSchemaIndexer()
 
-    # 2. Retrieve relevant context
-    print(f"\n[2] Retrieving schema context for: '{question[:60]}...'")
-    context = indexer.get_context(question, top_k=top_k)
-    print(f"    Retrieved {len(context)} chars of context")
+            # Check if collection exists and has data
+            if indexer.client.collections.exists(indexer.COLLECTION_NAME):
+                collection = indexer.client.collections.get(indexer.COLLECTION_NAME)
+                result = collection.aggregate.over_all(total_count=True)
+                if result.total_count > 0:
+                    print(f"    Using existing index with {result.total_count} types")
+                else:
+                    print("    Indexing schema into Weaviate...")
+                    indexer.create_collection()
+                    chunks = parse_schema_file(schema_path, "subquery")
+                    indexer.index_chunks(chunks)
+            else:
+                print("    Creating new Weaviate index...")
+                indexer.create_collection()
+                chunks = parse_schema_file(schema_path, "subquery")
+                indexer.index_chunks(chunks)
 
-    # Show top results
-    results = indexer.search(question, top_k=3)
+            # Use Weaviate's hybrid search
+            results = indexer.hybrid_search(question, top_k=top_k)
+            context = indexer.get_schema_context(question, top_k)
+
+        except Exception as e:
+            print(f"    Weaviate error: {e}")
+            print("    Falling back to in-memory indexer...")
+            use_weaviate = False
+
+    if not use_weaviate:
+        print("\n[1] Loading schema (in-memory)...")
+        indexer = SimpleSchemaIndexer()
+        count = indexer.load_schema(schema_path)
+        print(f"    Indexed {count} schema types")
+
+        context = indexer.get_context(question, top_k=top_k)
+        results = indexer.search(question, top_k=3)
+
+    # Show results
+    print(f"\n[2] Retrieved schema context ({len(context)} chars)")
     print("\n    Top schema matches:")
-    for i, r in enumerate(results, 1):
+    for i, r in enumerate(results[:3], 1):
         print(f"      {i}. {r['name']} (score: {r['score']:.3f})")
 
-    # 3. Generate query
+    # Generate query
     print("\n[3] Generating GraphQL query...")
     from src.llm.llm_client import get_llm
     llm = get_llm()
@@ -289,7 +325,8 @@ async def test_pipeline(
 async def test_dataset(
     schema_path: str,
     dataset_path: str,
-    limit: int = 5
+    limit: int = 5,
+    use_weaviate: bool = False
 ):
     """Test pipeline with dataset"""
 
@@ -365,6 +402,8 @@ def main():
     parser.add_argument("--dataset", "-d", help="Dataset JSON file")
     parser.add_argument("--limit", "-n", type=int, default=5, help="Number of questions to test")
     parser.add_argument("--top-k", type=int, default=5, help="Number of schema chunks to retrieve")
+    parser.add_argument("--use-weaviate", "-w", action="store_true",
+                        help="Use Weaviate (requires Docker)")
 
     args = parser.parse_args()
 
@@ -373,17 +412,17 @@ def main():
         return
 
     if args.question:
-        asyncio.run(test_pipeline(args.schema, args.question, args.top_k))
+        asyncio.run(test_pipeline(args.schema, args.question, args.top_k, args.use_weaviate))
     elif args.dataset:
         if not Path(args.dataset).exists():
             print(f"Error: Dataset not found: {args.dataset}")
             return
-        asyncio.run(test_dataset(args.schema, args.dataset, args.limit))
+        asyncio.run(test_dataset(args.schema, args.dataset, args.limit, args.use_weaviate))
     else:
         # Default: test with a sample question
         sample_question = "What is the total stake of all indexers?"
         print("No question or dataset provided. Testing with sample question.")
-        asyncio.run(test_pipeline(args.schema, sample_question, args.top_k))
+        asyncio.run(test_pipeline(args.schema, sample_question, args.top_k, args.use_weaviate))
 
 
 if __name__ == "__main__":
