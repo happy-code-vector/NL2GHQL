@@ -1,4 +1,4 @@
 """GraphQL agent components"""
-from .enhanced_graphql_agent import EnhancedGraphQLAgent, QueryIntent
+from .enhanced_graphql_agent import EnhancedGraphQLAgent
 
-__all__ = ["EnhancedGraphQLAgent", "QueryIntent"]
+__all__ = ["EnhancedGraphQLAgent"]

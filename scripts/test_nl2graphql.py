@@ -16,7 +16,6 @@ import sys
 import json
 import asyncio
 import argparse
-import re
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 
@@ -169,8 +168,8 @@ class SimpleSchemaIndexer:
             })
         return results
 
-    def get_context(self, query: str, top_k: int = 5) -> str:
-        """Get schema context for query"""
+    def get_schema_context(self, query: str, top_k: int = 5) -> str:
+        """Get schema context for query (interface matching agent requirements)"""
         results = self.search(query, top_k)
         parts = []
         for r in results:
@@ -180,64 +179,16 @@ class SimpleSchemaIndexer:
             parts.append("")
         return "\n".join(parts)
 
+    # Keep old method for backwards compatibility
+    def get_context(self, query: str, top_k: int = 5) -> str:
+        return self.get_schema_context(query, top_k)
 
-# --- Query Generation ---
 
-FEW_SHOT_EXAMPLES = """
-## Example 1: Count Query
-Question: "How many indexers are currently active?"
-GraphQL:
-```graphql
-query {
-  indexers(first: 1000, filter: { active: { equalTo: true } }) {
-    totalCount
-  }
-}
-```
-
-## Example 2: Superlative Query (highest/lowest)
-Question: "Which indexer has the highest total stake?"
-GraphQL:
-```graphql
-query {
-  indexers(first: 1, orderBy: [TOTAL_STAKE_DESC]) {
-    nodes {
-      id
-      totalStake
-    }
-  }
-}
-```
-
-## Example 3: Aggregation Query
-Question: "What is the total rewards earned in era 42200?"
-GraphQL:
-```graphql
-query {
-  eraRewards(filter: { eraIdx: { equalTo: 42200 } }) {
-    nodes {
-      totalRewards
-    }
-  }
-}
-```
-"""
-
+# --- Query Validator ---
 
 def validate_graphql(query: str) -> Tuple[bool, Optional[str]]:
     """Validate GraphQL syntax"""
     try:
-        # Extract GraphQL from markdown code block if present
-        if "```graphql" in query:
-            match = re.search(r'```graphql\s*(.*?)\s*```', query, re.DOTALL)
-            if match:
-                query = match.group(1)
-        elif "```" in query:
-            match = re.search(r'```\s*(.*?)\s*```', query, re.DOTALL)
-            if match:
-                query = match.group(1)
-
-        # Try to parse
         parse(query.strip())
         return True, None
     except GraphQLSyntaxError as e:
@@ -246,80 +197,7 @@ def validate_graphql(query: str) -> Tuple[bool, Optional[str]]:
         return False, str(e)
 
 
-def extract_graphql(response: str) -> str:
-    """Extract clean GraphQL query from LLM response"""
-    # Try to find graphql code block
-    if "```graphql" in response:
-        match = re.search(r'```graphql\s*(.*?)\s*```', response, re.DOTALL)
-        if match:
-            return match.group(1).strip()
-
-    # Try to find any code block
-    if "```" in response:
-        match = re.search(r'```\s*(.*?)\s*```', response, re.DOTALL)
-        if match:
-            return match.group(1).strip()
-
-    # Return as-is
-    return response.strip()
-
-
-async def generate_query(llm, question: str, schema_context: str, max_retries: int = 2) -> Tuple[str, bool, List[str]]:
-    """
-    Generate GraphQL query with validation and retry.
-
-    Returns:
-        (query, is_valid, errors)
-    """
-    errors = []
-    query = ""
-
-    for attempt in range(max_retries + 1):
-        # Adjust prompt based on attempt
-        retry_hint = ""
-        if attempt > 0 and errors:
-            retry_hint = f"""
-
-## Previous Error (fix this):
-{errors[-1]}
-
-## Important
-Fix the syntax error and generate a valid GraphQL query."""
-
-        prompt = f"""You are a GraphQL query generator for a blockchain indexing service.
-
-Generate a valid GraphQL query based on the question and schema context.
-
-{FEW_SHOT_EXAMPLES}
-
-## Schema Context
-{schema_context}
-
-## Question
-{question}
-{retry_hint}
-
-## GraphQL Query
-Generate only the GraphQL query (no explanation):
-
-```graphql
-"""
-
-        response = await llm.generate_async(prompt)
-        query = extract_graphql(response)
-
-        # Validate
-        is_valid, error = validate_graphql(query)
-        if is_valid:
-            return query, True, errors
-
-        errors.append(error)
-        if attempt < max_retries:
-            print(f"    [Retry {attempt + 1}/{max_retries}] Validation failed: {error[:60]}...")
-
-    # Return last attempt even if invalid
-    return query, False, errors
-
+# --- Test Pipeline using EnhancedGraphQLAgent ---
 
 async def test_pipeline(
     schema_path: str,
@@ -327,13 +205,14 @@ async def test_pipeline(
     top_k: int = 5,
     use_weaviate: bool = False
 ):
-    """Test the full pipeline for a single question"""
+    """Test the full pipeline for a single question using EnhancedGraphQLAgent"""
 
     print("=" * 70)
     print("NL2GraphQL Pipeline Test")
     print("=" * 70)
 
     # Choose indexer
+    indexer = None
     if use_weaviate:
         print("\n[1] Using Weaviate (persistent index)...")
         try:
@@ -349,44 +228,58 @@ async def test_pipeline(
                 else:
                     print("    Indexing schema into Weaviate...")
                     indexer.create_collection()
-                    chunks = parse_schema_file(schema_path, "subquery")
+                    chunks = parse_schema_file(schema_path.replace('.json', '.graphql'), "subquery")
                     indexer.index_chunks(chunks)
             else:
                 print("    Creating new Weaviate index...")
                 indexer.create_collection()
-                chunks = parse_schema_file(schema_path, "subquery")
+                chunks = parse_schema_file(schema_path.replace('.json', '.graphql'), "subquery")
                 indexer.index_chunks(chunks)
-
-            # Use Weaviate's hybrid search
-            results = indexer.hybrid_search(question, top_k=top_k)
-            context = indexer.get_schema_context(question, top_k)
 
         except Exception as e:
             print(f"    Weaviate error: {e}")
             print("    Falling back to in-memory indexer...")
-            use_weaviate = False
+            indexer = None
 
-    if not use_weaviate:
+    if indexer is None:
         print("\n[1] Loading schema (in-memory)...")
         indexer = SimpleSchemaIndexer()
         count = indexer.load_schema(schema_path)
         print(f"    Indexed {count} schema types")
 
-        context = indexer.get_context(question, top_k=top_k)
-        results = indexer.search(question, top_k=3)
+    # Show retrieved context
+    context = indexer.get_schema_context(question, top_k=top_k)
+    results = indexer.search(question, top_k=3) if hasattr(indexer, 'search') else []
 
-    # Show results
     print(f"\n[2] Retrieved schema context ({len(context)} chars)")
-    print("\n    Top schema matches:")
-    for i, r in enumerate(results[:3], 1):
-        print(f"      {i}. {r['name']} (score: {r['score']:.3f})")
+    if results:
+        print("\n    Top schema matches:")
+        for i, r in enumerate(results[:3], 1):
+            print(f"      {i}. {r['name']} (score: {r['score']:.3f})")
 
-    # Generate query
-    print("\n[3] Generating GraphQL query...")
+    # Use EnhancedGraphQLAgent
+    print("\n[3] Generating GraphQL query with EnhancedGraphQLAgent...")
+    from src.agent.enhanced_graphql_agent import EnhancedGraphQLAgent
     from src.llm.llm_client import get_llm
-    llm = get_llm()
 
-    query, is_valid, errors = await generate_query(llm, question, context)
+    llm = get_llm()
+    agent = EnhancedGraphQLAgent(
+        schema_indexer=indexer,
+        llm_client=llm,
+        validator=None  # We'll validate separately
+    )
+
+    # Generate query using agent
+    result = await agent.answer_question(
+        question=question,
+        endpoint=None,  # Don't execute, just generate
+        schema_context_k=top_k
+    )
+
+    query = result.get('query', '')
+
+    # Validate generated query
+    is_valid, error = validate_graphql(query) if query else (False, "No query generated")
 
     print("\n" + "=" * 70)
     print("Generated GraphQL Query:")
@@ -395,8 +288,11 @@ async def test_pipeline(
         print(f"[VALID] {query}")
     else:
         print(f"[INVALID] {query}")
-        if errors:
-            print(f"\nValidation errors: {errors}")
+        if error:
+            print(f"\nValidation error: {error}")
+
+    if result.get('error'):
+        print(f"\nAgent error: {result['error']}")
 
     # Close Weaviate connection if used
     if use_weaviate and hasattr(indexer, 'close'):
@@ -411,7 +307,7 @@ async def test_dataset(
     limit: int = 5,
     use_weaviate: bool = False
 ):
-    """Test pipeline with dataset"""
+    """Test pipeline with dataset using EnhancedGraphQLAgent"""
 
     print("=" * 70)
     print("NL2GraphQL Dataset Test")
@@ -434,7 +330,6 @@ async def test_dataset(
                 else:
                     print("    Indexing schema into Weaviate...")
                     indexer.create_collection()
-                    # Use GraphQL file instead of corrupted JSON
                     gql_path = schema_path.replace('.json', '.graphql')
                     chunks = parse_schema_file(gql_path, "subquery")
                     indexer.index_chunks(chunks)
@@ -453,7 +348,6 @@ async def test_dataset(
     if indexer is None:
         print("\n[1] Loading schema (in-memory)...")
         indexer = SimpleSchemaIndexer()
-        # Try GraphQL file if JSON fails
         try:
             count = indexer.load_schema(schema_path)
         except json.JSONDecodeError:
@@ -470,9 +364,16 @@ async def test_dataset(
     questions = dataset[:limit]
     print(f"    Testing {len(questions)} questions")
 
-    # Initialize LLM
+    # Initialize agent
+    from src.agent.enhanced_graphql_agent import EnhancedGraphQLAgent
     from src.llm.llm_client import get_llm
+
     llm = get_llm()
+    agent = EnhancedGraphQLAgent(
+        schema_indexer=indexer,
+        llm_client=llm,
+        validator=None
+    )
 
     results = []
     for i, item in enumerate(questions, 1):
@@ -483,28 +384,33 @@ async def test_dataset(
         print(f"[{i}/{len(questions)}] Question: {question[:80]}...")
         print("-" * 70)
 
-        # Retrieve context
-        # Use correct method name for Weaviate
-        if hasattr(indexer, 'get_schema_context'):
-            context = indexer.get_schema_context(question, top_k=5)
-        else:
-            context = indexer.get_context(question, top_k=5)
-
-        # Generate query with validation and retry
         try:
-            query, is_valid, val_errors = await generate_query(llm, question, context)
+            # Use agent to generate query
+            result = await agent.answer_question(
+                question=question,
+                endpoint=None,
+                schema_context_k=5
+            )
+
+            query = result.get('query', '')
+            is_valid, error = validate_graphql(query) if query else (False, "No query generated")
+
             results.append({
                 'question': question,
                 'expected_score': expected_score,
                 'query': query,
                 'is_valid': is_valid,
-                'validation_errors': val_errors if val_errors else None,
-                'success': True
+                'validation_error': error,
+                'success': bool(query),
+                'elapsed_time': result.get('elapsed_time', 0)
             })
+
             status = "[VALID]" if is_valid else "[INVALID]"
             print(f"Generated Query {status}:\n{query[:500]}...")
-            if not is_valid and val_errors:
-                print(f"  Validation errors: {val_errors[-1] if val_errors else 'None'}")
+            if not is_valid and error:
+                print(f"  Validation error: {error}")
+            print(f"  Time: {result.get('elapsed_time', 0):.2f}s")
+
         except Exception as e:
             print(f"ERROR: {e}")
             results.append({
@@ -520,7 +426,16 @@ async def test_dataset(
     print("Summary")
     print("=" * 70)
     success_count = sum(1 for r in results if r['success'])
-    print(f"Success: {success_count}/{len(results)}")
+    valid_count = sum(1 for r in results if r.get('is_valid'))
+    avg_time = sum(r.get('elapsed_time', 0) for r in results) / len(results) if results else 0
+
+    print(f"Generated: {success_count}/{len(results)}")
+    print(f"Valid GraphQL: {valid_count}/{len(results)}")
+    print(f"Avg time: {avg_time:.2f}s")
+
+    # Close Weaviate connection if used
+    if use_weaviate and hasattr(indexer, 'close'):
+        indexer.close()
 
     return results
 
