@@ -338,11 +338,50 @@ async def test_dataset(
     print("NL2GraphQL Dataset Test")
     print("=" * 70)
 
-    # Load schema
-    print("\n[1] Loading schema...")
-    indexer = SimpleSchemaIndexer()
-    count = indexer.load_schema(schema_path)
-    print(f"    Indexed {count} schema types")
+    # Choose indexer
+    indexer = None
+    if use_weaviate:
+        print("\n[1] Using Weaviate (persistent index)...")
+        try:
+            from src.rag.weaviate_indexer import WeaviateSchemaIndexer, parse_schema_file
+            indexer = WeaviateSchemaIndexer()
+
+            # Check if collection exists and has data
+            if indexer.client.collections.exists(indexer.COLLECTION_NAME):
+                collection = indexer.client.collections.get(indexer.COLLECTION_NAME)
+                result = collection.aggregate.over_all(total_count=True)
+                if result.total_count > 0:
+                    print(f"    Using existing index with {result.total_count} types")
+                else:
+                    print("    Indexing schema into Weaviate...")
+                    indexer.create_collection()
+                    # Use GraphQL file instead of corrupted JSON
+                    gql_path = schema_path.replace('.json', '.graphql')
+                    chunks = parse_schema_file(gql_path, "subquery")
+                    indexer.index_chunks(chunks)
+            else:
+                print("    Creating new Weaviate index...")
+                indexer.create_collection()
+                gql_path = schema_path.replace('.json', '.graphql')
+                chunks = parse_schema_file(gql_path, "subquery")
+                indexer.index_chunks(chunks)
+
+        except Exception as e:
+            print(f"    Weaviate error: {e}")
+            print("    Falling back to in-memory indexer...")
+            indexer = None
+
+    if indexer is None:
+        print("\n[1] Loading schema (in-memory)...")
+        indexer = SimpleSchemaIndexer()
+        # Try GraphQL file if JSON fails
+        try:
+            count = indexer.load_schema(schema_path)
+        except json.JSONDecodeError:
+            print("    JSON corrupted, using GraphQL file...")
+            gql_path = schema_path.replace('.json', '.graphql')
+            count = indexer.load_schema(gql_path)
+        print(f"    Indexed {count} schema types")
 
     # Load dataset
     print(f"\n[2] Loading dataset: {dataset_path}")
