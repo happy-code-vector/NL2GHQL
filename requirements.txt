@@ -4,19 +4,26 @@
 fastapi>=0.104.0
 uvicorn>=0.24.0
 pydantic>=2.5.0
+pydantic-settings>=2.0.0
 httpx>=0.25.0
 
 # GraphQL
 graphql-core>=3.2.0
 
-# LLM Client
+# LLM Client - Multi-provider support
 openai>=1.0.0
 
-# Vector Database & Embeddings
+# LangChain & LangGraph (for ReAct agent)
+langchain-core>=0.3.0
+langchain-google-genai>=2.0.0
+langchain-openai>=0.2.0
+langgraph>=0.2.0
+
+# Vector Database & Embeddings (optional, for RAG)
 weaviate-client>=4.0.0
 sentence-transformers>=2.2.0
 
-# Machine Learning
+# Machine Learning (optional, for fine-tuning)
 torch>=2.0.0
 transformers>=4.35.0
 datasets>=2.14.0
