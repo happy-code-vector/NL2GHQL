@@ -37,6 +37,19 @@ class LLMConfig:
     # vLLM specific
     gpu_memory_utilization: float = 0.85
 
+    def __post_init__(self):
+        """Convert string provider to enum if needed."""
+        if isinstance(self.provider, str):
+            provider_map = {
+                "gemini": LLMProvider.GEMINI,
+                "google": LLMProvider.GEMINI,
+                "openai": LLMProvider.OPENAI,
+                "gpt": LLMProvider.OPENAI,
+                "vllm": LLMProvider.VLLM,
+                "mock": LLMProvider.MOCK,
+            }
+            self.provider = provider_map.get(self.provider.lower(), LLMProvider.GEMINI)
+
     @classmethod
     def from_env(cls) -> "LLMConfig":
         """Load configuration from environment variables"""

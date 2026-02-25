@@ -100,14 +100,17 @@ class ReActGraphQLAgent:
 
     def _init_llm(self):
         """Initialize the LLM based on provider."""
-        if self.llm_config.provider.value == "gemini":
+        # Handle both enum and string provider types
+        provider_str = self.llm_config.provider.value if hasattr(self.llm_config.provider, 'value') else str(self.llm_config.provider)
+
+        if provider_str == "gemini":
             from langchain_google_genai import ChatGoogleGenerativeAI
             self.llm = ChatGoogleGenerativeAI(
                 model=self.llm_config.model,
                 google_api_key=self.llm_config.api_key,
                 temperature=self.llm_config.temperature,
             )
-        elif self.llm_config.provider.value == "openai":
+        elif provider_str == "openai":
             from langchain_openai import ChatOpenAI
             self.llm = ChatOpenAI(
                 model=self.llm_config.model,
